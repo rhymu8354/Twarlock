@@ -9,6 +9,7 @@
  */
 
 #include "Environment.hpp"
+#include "Twitch.hpp"
 
 #include <functional>
 #include <map>
@@ -30,6 +31,7 @@ namespace Twarlock {
             bool(
                 Twarlock::Environment& environment,
                 SystemAbstractions::DiagnosticsSender& diagnosticsSender,
+                Twitch& twitch,
                 const bool& shutDown
             )
         > execute;

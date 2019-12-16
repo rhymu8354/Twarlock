@@ -32,6 +32,11 @@
             branch="master"
             />
         <repository
+            path="O9KClock"
+            url="git@github.com:rhymu8354/O9KClock.git"
+            branch="master"
+            />
+        <repository
             path="StringExtensions"
             url="git@github.com:rhymu8354/StringExtensions.git"
             branch="master"

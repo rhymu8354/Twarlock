@@ -107,6 +107,7 @@ if(ParentDirectory STREQUAL "")
     add_subdirectory(HttpNetworkTransport)
     add_subdirectory(Json)
     add_subdirectory(MessageHeaders)
+    add_subdirectory(O9KClock)
     add_subdirectory(StringExtensions)
     add_subdirectory(SystemAbstractions)
     add_subdirectory(Timekeeping)
@@ -121,11 +122,17 @@ endif(ParentDirectory STREQUAL "")
 
 set(Sources
     src/Command.hpp
-    src/Commands.hpp
     src/Commands.cpp
+    src/Commands.hpp
     src/Environment.hpp
     src/Info.cpp
+    src/LoadFile.cpp
+    src/LoadFile.hpp
     src/main.cpp
+    src/TimeKeeper.cpp
+    src/TimeKeeper.hpp
+    src/Twitch.cpp
+    src/Twitch.hpp
 )
 
 add_executable(${This} ${Sources})
@@ -138,6 +145,7 @@ target_link_libraries(${This} PUBLIC
     Http
     HttpNetworkTransport
     Json
+    O9KClock
     StringExtensions
     SystemAbstractions
     TlsDecorator

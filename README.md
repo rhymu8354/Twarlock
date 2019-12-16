@@ -14,11 +14,11 @@ Twarlock uses the `Http::Client` class along with the
 
     Execute the given command.
 
-        CFG  Path to file containing the program configuration If not specified,
-             Twarlock searches for a configuration file named 'Twarlock.json' in
-             the current working directory, and then 'Twarlock.json' in directory
-             containing the program, and then '.twarlock' the current user's home
-             directory.
+        CFG  Path to file containing the program configuration If not
+             specified, Twarlock searches for a configuration file named
+             'Twarlock.json' in the current working directory, and then
+             '.twarlock' the current user's home directory, and then
+             'Twarlock.json' in directory containing the program.
 
         CMD  Name of command to execute:
              info  Query channel and user information
@@ -69,6 +69,9 @@ There are two distinct steps in the build process:
   a library which implements the transport interfaces needed by the `Http`
   library, in terms of the network endpoint and connection abstractions
   provided by the `SystemAbstractions` library.
+* [O9KClock](https://github.com/rhymu8354/O9KClock.git) - a library which
+  implements a high-precision real-time clock, by combining the separate
+  real-time and high-precision clocks provided by the operating system.
 * [Json](https://github.com/rhymu8354/Json.git) - a library which implements
   [RFC 7159](https://tools.ietf.org/html/rfc7159), "The JavaScript Object
   Notation (JSON) Data Interchange Format".

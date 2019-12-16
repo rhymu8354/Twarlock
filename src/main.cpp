@@ -9,17 +9,24 @@
 
 #include "Commands.hpp"
 #include "Environment.hpp"
+#include "LoadFile.hpp"
+#include "TimeKeeper.hpp"
+#include "Twitch.hpp"
 
 #include <algorithm>
 #include <functional>
 #include <Json/Value.hpp>
 #include <map>
+#include <math.h>
+#include <memory>
+#include <mutex>
 #include <signal.h>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <SystemAbstractions/DiagnosticsStreamReporter.hpp>
+#include <StringExtensions/StringExtensions.hpp>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
+#include <SystemAbstractions/File.hpp>
 #include <unordered_map>
 #include <vector>
 
@@ -101,6 +108,19 @@ namespace {
         return pad;
     }
 
+    std::string FormatDateTime(double time) {
+        char buffer[20];
+        auto timeSeconds = (time_t)time;
+        (void)strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", gmtime(&timeSeconds));
+        return (
+            std::string(buffer)
+            + StringExtensions::sprintf(
+                ".%06d",
+                (int)round((time - timeSeconds) * 1000000.0)
+            )
+        );
+    }
+
     void PrintUsageInformation(
         const std::string& argSummary,
         const std::string& cmdDetails,
@@ -142,8 +162,8 @@ namespace {
         "Path to file containing the program configuration"
         " If not specified, Twarlock searches for a configuration"
         " file named 'Twarlock.json' in the current working directory,"
-        " and then 'Twarlock.json' in directory containing the program,"
-        " and then '.twarlock' the current user's home directory."
+        " and then '.twarlock' the current user's home directory,"
+        " and then 'Twarlock.json' in directory containing the program."
     );
 
     /**
@@ -338,7 +358,35 @@ int main(int argc, char* argv[]) {
     const auto previousInterruptHandler = signal(SIGINT, InterruptHandler);
     Twarlock::Environment environment;
     (void)setbuf(stdout, NULL);
-    const auto diagnosticsPublisher = SystemAbstractions::DiagnosticsStreamReporter(stderr, stderr);
+    const auto diagnosticsPublisherOutputFile = stderr;
+    const auto timeKeeper = std::make_shared< Twarlock::TimeKeeper >();
+    const auto diagnosticsPublisherMutex = std::make_shared< std::mutex >();
+    const auto diagnosticsPublisher = [
+        diagnosticsPublisherOutputFile,
+        timeKeeper,
+        diagnosticsPublisherMutex
+    ](
+        std::string senderName,
+        size_t level,
+        std::string message
+    ) {
+        std::lock_guard< std::mutex > lock(*diagnosticsPublisherMutex);
+        std::string prefix;
+        if (level >= SystemAbstractions::DiagnosticsSender::Levels::ERROR) {
+            prefix = "error: ";
+        } else if (level >= SystemAbstractions::DiagnosticsSender::Levels::WARNING) {
+            prefix = "warning: ";
+        }
+        fprintf(
+            diagnosticsPublisherOutputFile,
+            "[%s %s:%zu] %s%s\n",
+            FormatDateTime(timeKeeper->GetCurrentTime()).c_str(),
+            senderName.c_str(),
+            level,
+            prefix.c_str(),
+            message.c_str()
+        );
+    };
     SystemAbstractions::DiagnosticsSender diagnosticsSender("Twarlock");
     (void)diagnosticsSender.SubscribeToDiagnostics(diagnosticsPublisher);
     const auto commands = Twarlock::Commands::Build();
@@ -381,17 +429,98 @@ int main(int argc, char* argv[]) {
                     environment.command.c_str()
                 );
                 exitStatus = EXIT_FAILURE;
-            } else {
+                break;
+            }
+            std::vector< std::string > configurationPaths;
+            if (environment.configurationFilePath.empty()) {
+                configurationPaths.push_back(
+                    SystemAbstractions::File::GetWorkingDirectory() + "/Twarlock.json"
+                );
+                configurationPaths.push_back(
+                    SystemAbstractions::File::GetUserHomeDirectory() + ".twarlock"
+                );
                 if (
-                    !command->second.execute(
-                        environment,
+                    SystemAbstractions::File::GetWorkingDirectory()
+                    != SystemAbstractions::File::GetExeParentDirectory()
+                ) {
+                    configurationPaths.push_back(
+                        SystemAbstractions::File::GetExeParentDirectory() + "/Twarlock.json"
+                    );
+                }
+            } else {
+                configurationPaths.push_back(environment.configurationFilePath);
+            }
+            bool configurationLoaded = false;
+            for (const auto configurationPath: configurationPaths) {
+                SystemAbstractions::File configurationFile(configurationPath);
+                if (!configurationFile.IsExisting()) {
+                    continue;
+                }
+                std::string configurationFileContents;
+                if (
+                    !Twarlock::LoadFile(
+                        configurationPath,
+                        "configuration",
                         diagnosticsSender,
-                        shutDown
+                        configurationFileContents
                     )
                 ) {
-                    exitStatus = EXIT_FAILURE;
+                    continue;
                 }
+                environment.configuration = Json::Value::FromEncoding(configurationFileContents);
+                if (environment.configuration.GetType() == Json::Value::Type::Invalid) {
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        SystemAbstractions::DiagnosticsSender::Levels::ERROR,
+                        "Unable to parse configuration file '%s'",
+                        configurationPath.c_str()
+                    );
+                    continue;
+                }
+                configurationLoaded = true;
+                break;
             }
+            if (!configurationLoaded) {
+                diagnosticsSender.SendDiagnosticInformationString(
+                    SystemAbstractions::DiagnosticsSender::Levels::ERROR,
+                    "Unable to load configuration"
+                );
+                exitStatus = EXIT_FAILURE;
+                break;
+            }
+            std::string caCerts;
+            const auto caCertsPath = SystemAbstractions::File::GetExeParentDirectory() + "/cert.pem";
+            if (
+                !Twarlock::LoadFile(
+                    caCertsPath,
+                    "CA certificates",
+                    diagnosticsSender,
+                    caCerts
+                )
+            ) {
+                exitStatus = EXIT_FAILURE;
+                break;
+            }
+            Twarlock::Twitch twitch;
+            twitch.SubscribeToDiagnostics(
+                diagnosticsSender.Chain(),
+                (int)environment.configuration["diagnosticsThreshold"]
+            );
+            twitch.Mobilize(
+                environment.configuration,
+                caCerts,
+                timeKeeper
+            );
+            if (
+                !command->second.execute(
+                    environment,
+                    diagnosticsSender,
+                    twitch,
+                    shutDown
+                )
+            ) {
+                exitStatus = EXIT_FAILURE;
+            }
+            twitch.Demobilize();
         } break;
 
         case Twarlock::Environment::Mode::Unknown:
