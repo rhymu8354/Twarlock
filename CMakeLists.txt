@@ -125,6 +125,7 @@ set(Sources
     src/Commands.cpp
     src/Commands.hpp
     src/Environment.hpp
+    src/Followers.cpp
     src/Info.cpp
     src/LoadFile.cpp
     src/LoadFile.hpp
