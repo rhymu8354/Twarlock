@@ -10,11 +10,14 @@
 
 #include <AsyncData/MultiProducerSingleConsumerQueue.hpp>
 #include <condition_variable>
+#include <future>
 #include <Http/Client.hpp>
 #include <HttpNetworkTransport/HttpClientNetworkTransport.hpp>
+#include <inttypes.h>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <StringExtensions/StringExtensions.hpp>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
 #include <SystemAbstractions/NetworkConnection.hpp>
 #include <thread>
@@ -184,6 +187,7 @@ namespace Twarlock {
                             id,
                             onSuccess,
                             onFailure,
+                            targetUriString,
                             selfWeakCopy
                         ]{
                             auto impl = selfWeakCopy.lock();
@@ -210,8 +214,9 @@ namespace Twarlock {
                             } else {
                                 impl->diagnosticsSender.SendDiagnosticInformationFormatted(
                                     SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                    "Twitch API call %d failure: %u",
+                                    "Twitch API call %d (%s) failure: %u",
                                     id,
+                                    targetUriString.c_str(),
                                     httpClientTransaction->response.statusCode
                                 );
                                 onFailure(httpClientTransaction->response.statusCode);
@@ -335,6 +340,36 @@ namespace Twarlock {
     ) {
         std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
         impl_->PostApiCall(api, targetUriString, onSuccess, onFailure);
+    }
+
+    intmax_t Twitch::GetUserIdByName(const std::string& name) {
+        const auto done = std::make_shared< std::promise< intmax_t > >();
+        PostApiCall(
+            Twitch::Api::Kraken,
+            StringExtensions::sprintf("users?login=%s", name.c_str()),
+            [&](Json::Value&& response){
+                intmax_t userid;
+                if (
+                    sscanf(
+                        ((std::string)response["users"][0]["_id"]).c_str(), "%" SCNdMAX,
+                        &userid
+                    ) == 1
+                ) {
+                    done->set_value(userid);
+                } else {
+                    impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                        SystemAbstractions::DiagnosticsSender::Levels::WARNING,
+                        "Twitch API returned invalid ID for user '%s'",
+                        name.c_str()
+                    );
+                    done->set_value(0);
+                }
+            },
+            [&](unsigned int statusCode){
+                done->set_value(0);
+            }
+        );
+        return done->get_future().get();
     }
 
 }

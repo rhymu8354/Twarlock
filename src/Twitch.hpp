@@ -12,6 +12,7 @@
 #include <Http/TimeKeeper.hpp>
 #include <Json/Value.hpp>
 #include <memory>
+#include <stdint.h>
 #include <string>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
 
@@ -78,6 +79,8 @@ namespace Twarlock {
             std::function< void(Json::Value&& response) > onSuccess,
             std::function< void(unsigned int statusCode) > onFailure
         );
+
+        intmax_t GetUserIdByName(const std::string& name);
 
         // Private properties
     private:
