@@ -14,7 +14,9 @@
 #include <StringExtensions/StringExtensions.hpp>
 #include <SystemAbstractions/DiagnosticsSender.hpp>
 
-namespace Twarlock {
+using namespace Twarlock;
+
+namespace {
 
     bool Info(
         Environment& environment,
