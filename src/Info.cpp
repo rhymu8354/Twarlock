@@ -30,6 +30,9 @@ namespace Twarlock {
             return false;
         }
         const auto userid = twitch.GetUserIdByName(environment.args[0]);
+        if (userid == 0) {
+            return false;
+        }
         printf(
             "User '%s' has id: %" PRIdMAX "\n",
             environment.args[0].c_str(),
