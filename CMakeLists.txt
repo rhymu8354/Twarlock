@@ -121,6 +121,7 @@ endif(ParentDirectory STREQUAL "")
 # ----------------------------------------------------------------------------
 
 set(Sources
+    src/Api.cpp
     src/Command.hpp
     src/Commands.cpp
     src/Commands.hpp
