@@ -246,10 +246,11 @@ namespace Twarlock {
                             } else {
                                 impl->diagnosticsSender.SendDiagnosticInformationFormatted(
                                     SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-                                    "Twitch API call %d (%s) failure: %u",
+                                    "Twitch API call %d (%s) failure: %u (%s)",
                                     id,
                                     targetUriString.c_str(),
-                                    httpClientTransaction->response.statusCode
+                                    httpClientTransaction->response.statusCode,
+                                    httpClientTransaction->response.body.c_str()
                                 );
                                 onFailure(httpClientTransaction->response.statusCode);
                             }
