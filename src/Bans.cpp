@@ -45,7 +45,7 @@ namespace {
             numNewBannedUserIds = 0;
             const auto done = std::make_shared< std::promise< void > >();
             auto uri = StringExtensions::sprintf(
-                "moderation/banned?broadcaster_id=%" PRIdMAX,
+                "moderation/banned?broadcaster_id=%" PRIdMAX "&first=100",
                 userid
             );
             if (!cursor.empty()) {
