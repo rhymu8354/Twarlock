@@ -122,6 +122,7 @@ endif(ParentDirectory STREQUAL "")
 
 set(Sources
     src/Api.cpp
+    src/Bans.cpp
     src/Command.hpp
     src/Commands.cpp
     src/Commands.hpp
@@ -132,6 +133,8 @@ set(Sources
     src/LoadFile.cpp
     src/LoadFile.hpp
     src/main.cpp
+    src/OAuthAuthorize.cpp
+    src/OAuthRevoke.cpp
     src/OAuthValidate.cpp
     src/TimeKeeper.cpp
     src/TimeKeeper.hpp

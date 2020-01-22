@@ -161,6 +161,11 @@ namespace Twarlock {
                             targetUriString = std::string("https://id.twitch.tv/oauth2/") + resource;
                         } break;
 
+                        case Api::RawGet:
+                        case Api::RawPost: {
+                            targetUriString = std::string("https://") + resource;
+                        } break;
+
                         default: {
                             diagnosticsSender.SendDiagnosticInformationFormatted(
                                 SystemAbstractions::DiagnosticsSender::Levels::ERROR,
@@ -179,16 +184,29 @@ namespace Twarlock {
                         id,
                         targetUriString.c_str()
                     );
-                    request.method = "GET";
+                    if (api == Api::RawPost) {
+                        request.method = "POST";
+                    } else {
+                        request.method = "GET";
+                    }
                     request.target.ParseFromString(targetUriString);
                     request.target.SetPort(443);
-                    if (api != Api::OAuth2) {
+                    if (
+                        (api != Api::OAuth2)
+                        && (api != Api::RawGet)
+                        && (api != Api::RawPost)
+                    ) {
                         request.headers.SetHeader("Client-ID", configuration["clientId"]);
                     }
                     if (configuration.Has("oauthToken")) {
                         const std::string oauthToken = configuration["oauthToken"];
+                        diagnosticsSender.SendDiagnosticInformationFormatted(
+                            0,
+                            "Using OAuth token: %s",
+                            oauthToken.c_str()
+                        );
                         switch (api) {
-                            case Api::Kraken: {
+                            case Api::Helix: {
                                 request.headers.SetHeader(
                                     "Authorization",
                                     StringExtensions::sprintf(
@@ -198,9 +216,8 @@ namespace Twarlock {
                                 );
                             } break;
 
-                            case Api::Helix:
-                            case Api::OAuth2:
-                            default: {
+                            case Api::Kraken:
+                            case Api::OAuth2: {
                                 request.headers.SetHeader(
                                     "Authorization",
                                     StringExtensions::sprintf(
@@ -208,6 +225,9 @@ namespace Twarlock {
                                         oauthToken.c_str()
                                     )
                                 );
+                            } break;
+
+                            default: {
                             } break;
                         }
                     }

@@ -28,6 +28,8 @@ namespace Twarlock {
             Kraken,
             Helix,
             OAuth2,
+            RawGet,
+            RawPost,
         };
 
         // Lifecycle Methods
