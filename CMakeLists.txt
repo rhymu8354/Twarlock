@@ -123,6 +123,7 @@ endif(ParentDirectory STREQUAL "")
 set(Sources
     src/Api.cpp
     src/Bans.cpp
+    src/BanEvents.cpp
     src/Command.hpp
     src/Commands.cpp
     src/Commands.hpp
