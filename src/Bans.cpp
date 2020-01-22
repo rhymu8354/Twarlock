@@ -37,17 +37,36 @@ namespace {
         if (userid == 0) {
             return false;
         }
+        std::string targetUserName;
+        intmax_t targetUserid = 0;
+        if (environment.args.size() >= 2) {
+            targetUserName = environment.args[1];
+            targetUserid = twitch.GetUserIdByName(targetUserName);
+            if (targetUserid == 0) {
+                return false;
+            }
+        }
         std::unordered_set< intmax_t > bannedUserIds;
         std::string cursor;
-        printf("--------------------------------------------------\n");
+        if (targetUserid == 0) {
+            printf("--------------------------------------------------\n");
+        }
         size_t numNewBannedUserIds;
         do {
             numNewBannedUserIds = 0;
             const auto done = std::make_shared< std::promise< void > >();
             auto uri = StringExtensions::sprintf(
-                "moderation/banned?broadcaster_id=%" PRIdMAX "&first=100",
+                "moderation/banned?broadcaster_id=%" PRIdMAX,
                 userid
             );
+            if (targetUserid == 0) {
+                uri += "&first=100";
+            } else {
+                uri += StringExtensions::sprintf(
+                    "&user_id=%" PRIdMAX,
+                    targetUserid
+                );
+            }
             if (!cursor.empty()) {
                 uri += StringExtensions::sprintf(
                     "&after=%s",
@@ -59,22 +78,27 @@ namespace {
                 uri,
                 [&](Json::Value&& response){
                     cursor = response["pagination"]["cursor"];
-                    for (auto dataEntry: response["data"]) {
-                        const auto& banned = dataEntry.value();
-                        intmax_t bannedUserid = 0;
-                        if (
-                            sscanf(
-                                ((std::string)banned["user_id"]).c_str(), "%" SCNdMAX,
-                                &bannedUserid
-                            ) == 1
-                        ) {
-                            if (bannedUserIds.insert(bannedUserid).second) {
-                                ++numNewBannedUserIds;
-                                printf(
-                                    "%s (%" PRIdMAX ")\n",
-                                    ((std::string)banned["user_name"]).c_str(),
-                                    bannedUserid
-                                );
+                    const auto& data = response["data"];
+                    if (data.GetType() == Json::Value::Type::Array) {
+                        for (auto dataEntry: data) {
+                            const auto& banned = dataEntry.value();
+                            intmax_t bannedUserid = 0;
+                            if (
+                                sscanf(
+                                    ((std::string)banned["user_id"]).c_str(), "%" SCNdMAX,
+                                    &bannedUserid
+                                ) == 1
+                            ) {
+                                if (bannedUserIds.insert(bannedUserid).second) {
+                                    ++numNewBannedUserIds;
+                                    if (targetUserid == 0) {
+                                        printf(
+                                            "%s (%" PRIdMAX ")\n",
+                                            ((std::string)banned["user_name"]).c_str(),
+                                            bannedUserid
+                                        );
+                                    }
+                                }
                             }
                         }
                     }
@@ -89,25 +113,40 @@ namespace {
             !cursor.empty()
             && (numNewBannedUserIds > 0)
         );
-        printf("--------------------------------------------------\n");
-        printf(
-            "Channel '%s' has %zu total Bans.\n",
-            channelName.c_str(),
-            bannedUserIds.size()
-        );
+        if (targetUserid == 0) {
+            printf("--------------------------------------------------\n");
+            printf(
+                "Channel '%s' has %zu total Bans.\n",
+                channelName.c_str(),
+                bannedUserIds.size()
+            );
+        } else {
+            printf(
+                "User %s (%" PRIdMAX ") %s.\n",
+                targetUserName.c_str(),
+                targetUserid,
+                (
+                    bannedUserIds.empty()
+                    ? "is not banned"
+                    : "is banned"
+                )
+            );
+        }
         return true;
     };
 
     struct RegisterInfo {
         RegisterInfo() {
             Command command;
-            command.cmdSummary = "Download banned users list";
+            command.cmdSummary = "Download or query banned users list";
             command.cmdDetails = (
-                "Download complete banned users list."
+                "Download complete banned users list, or query the list"
+                " to see if a specific user is banned."
             );
-            command.argSummary = "<CHANNEL>";
+            command.argSummary = "<CHANNEL> [USER]";
             command.argDetails = {
                 {"CHANNEL", "Name of the channel for which to download banned user list"},
+                {"USER", "Name of the user to check if banned"},
             };
             command.execute = Bans;
             Commands::Add("bans", std::move(command));
