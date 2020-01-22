@@ -132,6 +132,7 @@ set(Sources
     src/LoadFile.cpp
     src/LoadFile.hpp
     src/main.cpp
+    src/OAuthValidate.cpp
     src/TimeKeeper.cpp
     src/TimeKeeper.hpp
     src/Twitch.cpp

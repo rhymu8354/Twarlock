@@ -157,6 +157,10 @@ namespace Twarlock {
                             targetUriString = std::string("https://api.twitch.tv/helix/") + resource;
                         } break;
 
+                        case Api::OAuth2: {
+                            targetUriString = std::string("https://id.twitch.tv/oauth2/") + resource;
+                        } break;
+
                         default: {
                             diagnosticsSender.SendDiagnosticInformationFormatted(
                                 SystemAbstractions::DiagnosticsSender::Levels::ERROR,
@@ -178,7 +182,35 @@ namespace Twarlock {
                     request.method = "GET";
                     request.target.ParseFromString(targetUriString);
                     request.target.SetPort(443);
-                    request.headers.SetHeader("Client-ID", configuration["clientId"]);
+                    if (api != Api::OAuth2) {
+                        request.headers.SetHeader("Client-ID", configuration["clientId"]);
+                    }
+                    if (configuration.Has("oauthToken")) {
+                        const std::string oauthToken = configuration["oauthToken"];
+                        switch (api) {
+                            case Api::Kraken: {
+                                request.headers.SetHeader(
+                                    "Authorization",
+                                    StringExtensions::sprintf(
+                                        "Bearer %s",
+                                        oauthToken.c_str()
+                                    )
+                                );
+                            } break;
+
+                            case Api::Helix:
+                            case Api::OAuth2:
+                            default: {
+                                request.headers.SetHeader(
+                                    "Authorization",
+                                    StringExtensions::sprintf(
+                                        "OAuth %s",
+                                        oauthToken.c_str()
+                                    )
+                                );
+                            } break;
+                        }
+                    }
                     auto& httpClientTransaction = httpClientTransactions[id];
                     httpClientTransaction = httpClient->Request(request);
                     auto selfWeakCopy(selfWeak);

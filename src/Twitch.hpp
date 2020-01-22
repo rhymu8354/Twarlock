@@ -27,6 +27,7 @@ namespace Twarlock {
         enum class Api {
             Kraken,
             Helix,
+            OAuth2,
         };
 
         // Lifecycle Methods
